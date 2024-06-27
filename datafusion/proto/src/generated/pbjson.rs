@@ -536,7 +536,6 @@ impl serde::Serialize for AggregateFunction {
             Self::Max => "MAX",
             Self::ArrayAgg => "ARRAY_AGG",
             Self::Grouping => "GROUPING",
-            Self::NthValueAgg => "NTH_VALUE_AGG",
         };
         serializer.serialize_str(variant)
     }
@@ -552,7 +551,6 @@ impl<'de> serde::Deserialize<'de> for AggregateFunction {
             "MAX",
             "ARRAY_AGG",
             "GROUPING",
-            "NTH_VALUE_AGG",
         ];
 
         struct GeneratedVisitor;
@@ -597,7 +595,6 @@ impl<'de> serde::Deserialize<'de> for AggregateFunction {
                     "MAX" => Ok(AggregateFunction::Max),
                     "ARRAY_AGG" => Ok(AggregateFunction::ArrayAgg),
                     "GROUPING" => Ok(AggregateFunction::Grouping),
-                    "NTH_VALUE_AGG" => Ok(AggregateFunction::NthValueAgg),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

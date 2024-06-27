@@ -652,30 +652,32 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
     ///
     /// returns Some(Expr) if the expression was simplified, otherwise None
     /// TODO: this should likely be done in ArrayAgg::simplify when it is moved to a UDAF
-    fn simplify_array_index_expr(expr: &Expr, index: &Expr) -> Option<Expr> {
-        fn is_array_agg(agg_func: &datafusion_expr::expr::AggregateFunction) -> bool {
+    fn simplify_array_index_expr(_expr: &Expr, _index: &Expr) -> Option<Expr> {
+        fn _is_array_agg(agg_func: &datafusion_expr::expr::AggregateFunction) -> bool {
             agg_func.func_def
                 == datafusion_expr::expr::AggregateFunctionDefinition::BuiltIn(
                     AggregateFunction::ArrayAgg,
                 )
         }
-        match expr {
-            Expr::AggregateFunction(agg_func) if is_array_agg(agg_func) => {
-                let mut new_args = agg_func.args.clone();
-                new_args.push(index.clone());
-                Some(Expr::AggregateFunction(
-                    datafusion_expr::expr::AggregateFunction::new(
-                        AggregateFunction::NthValue,
-                        new_args,
-                        agg_func.distinct,
-                        agg_func.filter.clone(),
-                        agg_func.order_by.clone(),
-                        agg_func.null_treatment,
-                    ),
-                ))
-            }
-            _ => None,
-        }
+        // TODO: Temporary fix! Enable when `ARRAY_AGG` is moved to UDAF
+        // match expr {
+        //     Expr::AggregateFunction(agg_func) if is_array_agg(agg_func) => {
+        //         let mut new_args = agg_func.args.clone();
+        //         new_args.push(index.clone());
+        //         Some(Expr::AggregateFunction(
+        //             datafusion_expr::expr::AggregateFunction::new(
+        //                 AggregateFunction::NthValue,
+        //                 new_args,
+        //                 agg_func.distinct,
+        //                 agg_func.filter.clone(),
+        //                 agg_func.order_by.clone(),
+        //                 agg_func.null_treatment,
+        //             ),
+        //         ))
+        //     }
+        //     _ => None,
+        // }
+        None
     }
 
     /// Parses a struct(..) expression

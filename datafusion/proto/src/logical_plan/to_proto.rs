@@ -112,7 +112,6 @@ impl From<&AggregateFunction> for protobuf::AggregateFunction {
             AggregateFunction::Max => Self::Max,
             AggregateFunction::ArrayAgg => Self::ArrayAgg,
             AggregateFunction::Grouping => Self::Grouping,
-            AggregateFunction::NthValue => Self::NthValueAgg,
         }
     }
 }
@@ -373,9 +372,6 @@ pub fn serialize_expr(
                     AggregateFunction::Min => protobuf::AggregateFunction::Min,
                     AggregateFunction::Max => protobuf::AggregateFunction::Max,
                     AggregateFunction::Grouping => protobuf::AggregateFunction::Grouping,
-                    AggregateFunction::NthValue => {
-                        protobuf::AggregateFunction::NthValueAgg
-                    }
                 };
 
                 let aggregate_expr = protobuf::AggregateExprNode {

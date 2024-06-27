@@ -39,8 +39,6 @@ pub enum AggregateFunction {
     Max,
     /// Aggregation into an array
     ArrayAgg,
-    /// N'th value in a group according to some ordering
-    NthValue,
     /// Grouping
     Grouping,
 }
@@ -52,7 +50,6 @@ impl AggregateFunction {
             Min => "MIN",
             Max => "MAX",
             ArrayAgg => "ARRAY_AGG",
-            NthValue => "NTH_VALUE",
             Grouping => "GROUPING",
         }
     }
@@ -72,7 +69,6 @@ impl FromStr for AggregateFunction {
             "max" => AggregateFunction::Max,
             "min" => AggregateFunction::Min,
             "array_agg" => AggregateFunction::ArrayAgg,
-            "nth_value" => AggregateFunction::NthValue,
             // other
             "grouping" => AggregateFunction::Grouping,
             _ => {
@@ -120,7 +116,6 @@ impl AggregateFunction {
                 input_expr_nullable[0],
             )))),
             AggregateFunction::Grouping => Ok(DataType::Int32),
-            AggregateFunction::NthValue => Ok(coerced_data_types[0].clone()),
         }
     }
 
@@ -131,7 +126,6 @@ impl AggregateFunction {
             AggregateFunction::Max | AggregateFunction::Min => Ok(true),
             AggregateFunction::ArrayAgg => Ok(false),
             AggregateFunction::Grouping => Ok(true),
-            AggregateFunction::NthValue => Ok(true),
         }
     }
 }
@@ -156,7 +150,6 @@ impl AggregateFunction {
                     .collect::<Vec<_>>();
                 Signature::uniform(1, valid, Volatility::Immutable)
             }
-            AggregateFunction::NthValue => Signature::any(2, Volatility::Immutable),
         }
     }
 }

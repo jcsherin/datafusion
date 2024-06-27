@@ -1926,7 +1926,7 @@ pub enum AggregateFunction {
     /// APPROX_PERCENTILE_CONT = 14;
     /// APPROX_MEDIAN = 15;
     /// APPROX_PERCENTILE_CONT_WITH_WEIGHT = 16;
-    Grouping = 17,
+    ///
     /// MEDIAN = 18;
     /// BIT_AND = 19;
     /// BIT_OR = 20;
@@ -1943,7 +1943,8 @@ pub enum AggregateFunction {
     /// REGR_SYY = 33;
     /// REGR_SXY = 34;
     /// STRING_AGG = 35;
-    NthValueAgg = 36,
+    /// NTH_VALUE_AGG = 36;
+    Grouping = 17,
 }
 impl AggregateFunction {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -1956,7 +1957,6 @@ impl AggregateFunction {
             AggregateFunction::Max => "MAX",
             AggregateFunction::ArrayAgg => "ARRAY_AGG",
             AggregateFunction::Grouping => "GROUPING",
-            AggregateFunction::NthValueAgg => "NTH_VALUE_AGG",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1966,7 +1966,6 @@ impl AggregateFunction {
             "MAX" => Some(Self::Max),
             "ARRAY_AGG" => Some(Self::ArrayAgg),
             "GROUPING" => Some(Self::Grouping),
-            "NTH_VALUE_AGG" => Some(Self::NthValueAgg),
             _ => None,
         }
     }
