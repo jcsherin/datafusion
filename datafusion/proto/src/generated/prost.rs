@@ -1929,8 +1929,8 @@ pub enum BuiltInWindowFunction {
     PercentRank = 3,
     CumeDist = 4,
     Ntile = 5,
-    Lag = 6,
-    Lead = 7,
+    /// LAG = 6;
+    /// LEAD = 7;
     FirstValue = 8,
     LastValue = 9,
     NthValue = 10,
@@ -1948,8 +1948,6 @@ impl BuiltInWindowFunction {
             BuiltInWindowFunction::PercentRank => "PERCENT_RANK",
             BuiltInWindowFunction::CumeDist => "CUME_DIST",
             BuiltInWindowFunction::Ntile => "NTILE",
-            BuiltInWindowFunction::Lag => "LAG",
-            BuiltInWindowFunction::Lead => "LEAD",
             BuiltInWindowFunction::FirstValue => "FIRST_VALUE",
             BuiltInWindowFunction::LastValue => "LAST_VALUE",
             BuiltInWindowFunction::NthValue => "NTH_VALUE",
@@ -1964,8 +1962,6 @@ impl BuiltInWindowFunction {
             "PERCENT_RANK" => Some(Self::PercentRank),
             "CUME_DIST" => Some(Self::CumeDist),
             "NTILE" => Some(Self::Ntile),
-            "LAG" => Some(Self::Lag),
-            "LEAD" => Some(Self::Lead),
             "FIRST_VALUE" => Some(Self::FirstValue),
             "LAST_VALUE" => Some(Self::LastValue),
             "NTH_VALUE" => Some(Self::NthValue),
