@@ -24,10 +24,10 @@ use std::collections::VecDeque;
 use std::ops::Range;
 use std::sync::Arc;
 
-use datafusion_common::{arrow_datafusion_err, DataFusionError, Result, ScalarValue};
 use datafusion_common::arrow::array::ArrayRef;
 use datafusion_common::arrow::compute::concat;
 use datafusion_common::arrow::datatypes::DataType;
+use datafusion_common::{arrow_datafusion_err, DataFusionError, Result, ScalarValue};
 use datafusion_expr::{
     PartitionEvaluator, Signature, TypeSignature, Volatility, WindowUDFImpl,
 };
@@ -149,10 +149,18 @@ impl BuiltInWindowFunctionExpr for WindowShift {
 pub struct WindowShift {
     signature: Signature,
     name: String,
+    shift_offset: i64,
+    default_value: ScalarValue,
+    ignore_nulls: bool,
 }
 
 impl WindowShift {
-    pub fn new(name: String) -> Self {
+    pub fn new(
+        name: String,
+        shift_offset: i64,
+        default_value: ScalarValue,
+        ignore_nulls: bool,
+    ) -> Self {
         Self {
             signature: Signature::one_of(
                 vec![
@@ -163,6 +171,9 @@ impl WindowShift {
                 Volatility::Immutable,
             ),
             name,
+            shift_offset,
+            default_value,
+            ignore_nulls,
         }
     }
 }
@@ -184,10 +195,13 @@ impl WindowUDFImpl for WindowShift {
         Ok(arg_types[0].clone())
     }
 
-    fn partition_evaluator(
-        &self,
-    ) -> datafusion_common::Result<Box<dyn PartitionEvaluator>> {
-        todo!()
+    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+        Ok(Box::new(WindowShiftEvaluator {
+            shift_offset: self.shift_offset,
+            default_value: self.default_value.clone(),
+            ignore_nulls: self.ignore_nulls,
+            non_null_offsets: VecDeque::new(),
+        }))
     }
 }
 
