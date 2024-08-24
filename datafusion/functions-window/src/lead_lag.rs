@@ -17,11 +17,23 @@
 
 //! Defines physical expression for `lead` and `lag` that can evaluated
 //! at runtime during query execution
-use crate::window::BuiltInWindowFunctionExpr;
-use crate::PhysicalExpr;
+
+use std::any::Any;
+use std::cmp::min;
+use std::collections::VecDeque;
+use std::ops::Range;
+use std::sync::Arc;
+
+use datafusion_common::{arrow_datafusion_err, DataFusionError, Result, ScalarValue};
+use datafusion_common::arrow::array::ArrayRef;
+use datafusion_common::arrow::compute::concat;
+use datafusion_common::arrow::datatypes::DataType;
+use datafusion_expr::{
+    PartitionEvaluator, Signature, TypeSignature, Volatility, WindowUDFImpl,
+};
+
 use arrow::array::ArrayRef;
 use arrow::datatypes::{DataType, Field};
-use arrow_array::Array;
 use datafusion_common::{arrow_datafusion_err, DataFusionError, Result, ScalarValue};
 use datafusion_expr::PartitionEvaluator;
 use std::any::Any;
@@ -132,8 +144,55 @@ impl BuiltInWindowFunctionExpr for WindowShift {
     }
 }
 
+/// window shift expression
 #[derive(Debug)]
-pub(crate) struct WindowShiftEvaluator {
+pub struct WindowShift {
+    signature: Signature,
+    name: String,
+}
+
+impl WindowShift {
+    pub fn new(name: String) -> Self {
+        Self {
+            signature: Signature::one_of(
+                vec![
+                    TypeSignature::Any(1),
+                    TypeSignature::Any(2),
+                    TypeSignature::Any(3),
+                ],
+                Volatility::Immutable,
+            ),
+            name,
+        }
+    }
+}
+
+impl WindowUDFImpl for WindowShift {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, arg_types: &[DataType]) -> datafusion_common::Result<DataType> {
+        Ok(arg_types[0].clone())
+    }
+
+    fn partition_evaluator(
+        &self,
+    ) -> datafusion_common::Result<Box<dyn PartitionEvaluator>> {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+struct WindowShiftEvaluator {
     shift_offset: i64,
     default_value: ScalarValue,
     ignore_nulls: bool,
@@ -205,8 +264,6 @@ fn shift_with_default_value(
     offset: i64,
     default_value: &ScalarValue,
 ) -> Result<ArrayRef> {
-    use arrow::compute::concat;
-
     let value_len = array.len() as i64;
     if offset == 0 {
         Ok(Arc::clone(array))
@@ -265,6 +322,25 @@ impl PartitionEvaluator for WindowShiftEvaluator {
     fn is_causal(&self) -> bool {
         // Lagging windows are causal by definition:
         self.is_lag()
+    }
+
+    fn evaluate_all(
+        &mut self,
+        values: &[ArrayRef],
+        _num_rows: usize,
+    ) -> Result<ArrayRef> {
+        // LEAD, LAG window functions take single column, values will have size 1
+        let value = &values[0];
+        if !self.ignore_nulls {
+            shift_with_default_value(value, self.shift_offset, &self.default_value)
+        } else {
+            evaluate_all_with_ignore_null(
+                value,
+                self.shift_offset,
+                &self.default_value,
+                self.is_lag(),
+            )
+        }
     }
 
     fn evaluate(
@@ -372,25 +448,6 @@ impl PartitionEvaluator for WindowShiftEvaluator {
             ScalarValue::try_from_array(array, idx.unwrap())
         } else {
             Ok(self.default_value.clone())
-        }
-    }
-
-    fn evaluate_all(
-        &mut self,
-        values: &[ArrayRef],
-        _num_rows: usize,
-    ) -> Result<ArrayRef> {
-        // LEAD, LAG window functions take single column, values will have size 1
-        let value = &values[0];
-        if !self.ignore_nulls {
-            shift_with_default_value(value, self.shift_offset, &self.default_value)
-        } else {
-            evaluate_all_with_ignore_null(
-                value,
-                self.shift_offset,
-                &self.default_value,
-                self.is_lag(),
-            )
         }
     }
 
