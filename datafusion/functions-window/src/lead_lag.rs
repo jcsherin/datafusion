@@ -269,7 +269,7 @@ impl WindowUDFImpl for WindowShift {
         &self.signature
     }
 
-    fn return_type(&self, arg_types: &[DataType]) -> datafusion_common::Result<DataType> {
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType> {
         Ok(arg_types[0].clone())
     }
 
