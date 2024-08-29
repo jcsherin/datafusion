@@ -1442,6 +1442,7 @@ version = "41.0.0"
 dependencies = [
  "datafusion-common",
  "datafusion-expr",
+ "datafusion-physical-expr",
  "datafusion-physical-expr-common",
  "log",
 ]
