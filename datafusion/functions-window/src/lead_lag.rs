@@ -29,8 +29,9 @@ use datafusion_common::arrow::compute::concat;
 use datafusion_common::arrow::datatypes::DataType;
 use datafusion_common::{arrow_datafusion_err, DataFusionError, Result, ScalarValue};
 use datafusion_expr::{
-    PartitionEvaluator, Signature, TypeSignature, Volatility, WindowUDFImpl,
+    Literal, PartitionEvaluator, Signature, TypeSignature, Volatility, WindowUDFImpl,
 };
+use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 
 use arrow::array::ArrayRef;
 use arrow::datatypes::{DataType, Field};
@@ -215,14 +216,52 @@ impl WindowUDFImpl for WindowShift {
         Ok(arg_types[0].clone())
     }
 
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+    fn partition_evaluator(
+        &self,
+        args: &[Arc<dyn PhysicalExpr>],
+        return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
+        let shift_offset = scalar_at(args, 1)
+            .map(|scalar| get_shift_offset(&self.mode, scalar))
+            .unwrap_or(self.mode.shift_offset(None));
+        let default_value = get_default_value(
+            return_type,
+            scalar_at(args, 2).unwrap_or(ScalarValue::Null),
+        )?;
+
         Ok(Box::new(WindowShiftEvaluator {
-            shift_offset: self.shift_offset,
-            default_value: self.default_value.clone(),
-            ignore_nulls: self.ignore_nulls,
+            shift_offset,
+            default_value,
+            ignore_nulls: false,
             non_null_offsets: VecDeque::new(),
         }))
     }
+}
+
+fn get_shift_offset(mode: &WindowShiftMode, scalar: ScalarValue) -> i64 {
+    match scalar {
+        ScalarValue::Int64(value) => mode.shift_offset(value),
+        ScalarValue::Null => mode.shift_offset(None),
+        _ => mode.shift_offset(None),
+    }
+}
+
+fn get_default_value(return_type: &DataType, value: ScalarValue) -> Result<ScalarValue> {
+    if value.is_null() {
+        ScalarValue::try_from(return_type)
+    } else {
+        value.cast_to(return_type)
+    }
+}
+
+fn scalar_at(exprs: &[Arc<dyn PhysicalExpr>], index: usize) -> Option<ScalarValue> {
+    exprs
+        .get(index)
+        .and_then(|expr| {
+            expr.as_any()
+                .downcast_ref::<datafusion_physical_expr::expressions::Literal>()
+        })
+        .map(|lit| lit.value().clone())
 }
 
 #[derive(Debug)]

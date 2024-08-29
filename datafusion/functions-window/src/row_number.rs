@@ -28,6 +28,7 @@ use datafusion_common::arrow::datatypes::DataType;
 use datafusion_common::{Result, ScalarValue};
 use datafusion_expr::expr::WindowFunction;
 use datafusion_expr::{Expr, PartitionEvaluator, Signature, Volatility, WindowUDFImpl};
+use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 
 /// Create a [`WindowFunction`](Expr::WindowFunction) expression for
 /// `row_number` user-defined window function.
@@ -88,7 +89,11 @@ impl WindowUDFImpl for RowNumber {
         Ok(DataType::UInt64)
     }
 
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+    fn partition_evaluator(
+        &self,
+        _args: &[std::sync::Arc<dyn PhysicalExpr>],
+        _return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
         Ok(Box::<NumRowsEvaluator>::default())
     }
 
