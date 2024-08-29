@@ -166,13 +166,10 @@ impl WindowUDFImpl for WindowShift {
         args: &[Arc<dyn PhysicalExpr>],
         return_type: &DataType,
     ) -> Result<Box<dyn PartitionEvaluator>> {
-        let shift_offset = scalar_at(args, 1)
-            .map(|scalar| get_shift_offset(&self.mode, scalar))
-            .unwrap_or(self.mode.shift_offset(None));
-        let default_value = get_default_value(
-            return_type,
-            scalar_at(args, 2).unwrap_or(ScalarValue::Null),
-        )?;
+        let shift_offset =
+            scalar_at(args, 1).and_then(|scalar| get_shift_offset(&self.mode, scalar))?;
+        let default_value = scalar_at(args, 2)
+            .and_then(|scalar| get_default_value(return_type, scalar))?;
 
         Ok(Box::new(WindowShiftEvaluator {
             shift_offset,
@@ -183,30 +180,46 @@ impl WindowUDFImpl for WindowShift {
     }
 }
 
-fn get_shift_offset(mode: &WindowShiftMode, scalar: ScalarValue) -> i64 {
-    match scalar {
-        ScalarValue::Int64(value) => mode.shift_offset(value),
-        ScalarValue::Null => mode.shift_offset(None),
+fn get_shift_offset(mode: &WindowShiftMode, scalar: Option<ScalarValue>) -> Result<i64> {
+    let value = match scalar {
+        Some(ScalarValue::Int64(value)) => mode.shift_offset(value),
         _ => mode.shift_offset(None),
+    };
+
+    Ok(value)
+}
+
+fn get_default_value(
+    return_type: &DataType,
+    value: Option<ScalarValue>,
+) -> Result<ScalarValue> {
+    match value {
+        Some(default_value) if !default_value.is_null() => {
+            default_value.cast_to(return_type)
+        }
+        // If None or Null datatype
+        _ => ScalarValue::try_from(return_type),
     }
 }
 
-fn get_default_value(return_type: &DataType, value: ScalarValue) -> Result<ScalarValue> {
-    if value.is_null() {
-        ScalarValue::try_from(return_type)
+fn scalar_at(
+    exprs: &[Arc<dyn PhysicalExpr>],
+    index: usize,
+) -> Result<Option<ScalarValue>> {
+    let value = if let Some(expr) = exprs.get(index) {
+        let inner = expr
+            .as_any()
+            .downcast_ref::<datafusion_physical_expr::expressions::Literal>()
+            .ok_or_else(|| DataFusionError::NotImplemented(
+                format!("There is only support Literal types for field at idx: {index} in Window Function."),
+            ))?
+            .value()
+            .clone();
+        Some(inner)
     } else {
-        value.cast_to(return_type)
-    }
-}
-
-fn scalar_at(exprs: &[Arc<dyn PhysicalExpr>], index: usize) -> Option<ScalarValue> {
-    exprs
-        .get(index)
-        .and_then(|expr| {
-            expr.as_any()
-                .downcast_ref::<datafusion_physical_expr::expressions::Literal>()
-        })
-        .map(|lit| lit.value().clone())
+        None
+    };
+    Ok(value)
 }
 
 #[derive(Debug)]
