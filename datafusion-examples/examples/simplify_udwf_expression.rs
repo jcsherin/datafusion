@@ -16,11 +16,13 @@
 // under the License.
 
 use std::any::Any;
+use std::sync::Arc;
 
 use arrow_schema::DataType;
 
 use datafusion::execution::context::SessionContext;
 use datafusion::functions_aggregate::average::avg_udaf;
+use datafusion::physical_expr::PhysicalExpr;
 use datafusion::{error::Result, execution::options::CsvReadOptions};
 use datafusion_expr::function::WindowFunctionSimplification;
 use datafusion_expr::{
@@ -64,7 +66,11 @@ impl WindowUDFImpl for SimplifySmoothItUdf {
         Ok(DataType::Float64)
     }
 
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+    fn partition_evaluator(
+        &self,
+        _args: &[Arc<dyn PhysicalExpr>],
+        _return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
         todo!()
     }
 

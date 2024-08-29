@@ -35,6 +35,7 @@ use datafusion_common::{Result, ScalarValue};
 use datafusion_expr::{
     PartitionEvaluator, Signature, Volatility, WindowUDF, WindowUDFImpl,
 };
+use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 
 /// A query with a window function evaluated over the entire partition
 const UNBOUNDED_WINDOW_QUERY: &str = "SELECT x, y, val, \
@@ -558,7 +559,11 @@ impl OddCounter {
                 Ok(self.return_type.clone())
             }
 
-            fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+            fn partition_evaluator(
+                &self,
+                _args: &[Arc<dyn PhysicalExpr>],
+                _return_type: &DataType,
+            ) -> Result<Box<dyn PartitionEvaluator>> {
                 Ok(Box::new(OddCounter::new(Arc::clone(&self.test_state))))
             }
 

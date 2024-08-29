@@ -48,6 +48,7 @@ use datafusion::functions_aggregate::expr_fn::{
 use datafusion::functions_aggregate::min_max::max_udaf;
 use datafusion::functions_nested::map::map;
 use datafusion::functions_window::row_number::row_number;
+use datafusion::physical_expr::PhysicalExpr;
 use datafusion::prelude::*;
 use datafusion::test_util::{TestTableFactory, TestTableProvider};
 use datafusion_common::config::TableOptions;
@@ -2409,7 +2410,11 @@ fn roundtrip_window() {
             Ok(arg_types[0].clone())
         }
 
-        fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+        fn partition_evaluator(
+            &self,
+            _args: &[Arc<dyn PhysicalExpr>],
+            _return_type: &DataType,
+        ) -> Result<Box<dyn PartitionEvaluator>> {
             make_partition_evaluator()
         }
     }

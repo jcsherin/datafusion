@@ -17,12 +17,14 @@
 
 use datafusion::{arrow::datatypes::DataType, logical_expr::Volatility};
 use std::any::Any;
+use std::sync::Arc;
 
 use arrow::{
     array::{ArrayRef, AsArray, Float64Array},
     datatypes::Float64Type,
 };
 use datafusion::error::Result;
+use datafusion::physical_expr::PhysicalExpr;
 use datafusion::prelude::*;
 use datafusion_common::ScalarValue;
 use datafusion_expr::{
@@ -77,7 +79,11 @@ impl WindowUDFImpl for SmoothItUdf {
 
     /// Create a `PartitionEvaluator` to evaluate this function on a new
     /// partition.
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+    fn partition_evaluator(
+        &self,
+        _args: &[Arc<dyn PhysicalExpr>],
+        _return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
         Ok(Box::new(MyPartitionEvaluator::new()))
     }
 }

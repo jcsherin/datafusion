@@ -1799,6 +1799,7 @@ mod tests {
         interval_arithmetic::Interval,
         *,
     };
+    use datafusion_physical_expr::PhysicalExpr;
     use std::{
         collections::HashMap,
         ops::{BitAnd, BitOr, BitXor},
@@ -3914,7 +3915,11 @@ mod tests {
             }
         }
 
-        fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+        fn partition_evaluator(
+            &self,
+            _args: &[Arc<dyn PhysicalExpr>],
+            _return_type: &DataType,
+        ) -> Result<Box<dyn PartitionEvaluator>> {
             unimplemented!("not needed for tests")
         }
     }
