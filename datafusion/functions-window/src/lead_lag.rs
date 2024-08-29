@@ -262,7 +262,7 @@ impl WindowUDFImpl for WindowShift {
     }
 
     fn name(&self) -> &str {
-        &self.mode.name()
+        self.mode.name()
     }
 
     fn signature(&self) -> &Signature {
