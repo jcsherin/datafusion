@@ -39,7 +39,11 @@ pub mod expr_fn {
 
 /// Returns all default window functions
 pub fn all_default_window_functions() -> Vec<Arc<WindowUDF>> {
-    vec![row_number::row_number_udwf()]
+    vec![
+        row_number::row_number_udwf(),
+        lead_lag::lead_udwf(),
+        lead_lag::lag_udwf(),
+    ]
 }
 /// Registers all enabled packages with a [`FunctionRegistry`]
 pub fn register_all(
