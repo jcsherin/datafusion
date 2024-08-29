@@ -21,7 +21,7 @@
 use std::any::Any;
 use std::cmp::min;
 use std::collections::VecDeque;
-use std::ops::Range;
+use std::ops::{Neg, Range};
 use std::sync::Arc;
 
 use datafusion_common::arrow::array::ArrayRef;
@@ -143,24 +143,36 @@ impl BuiltInWindowFunctionExpr for WindowShift {
         }))
     }
 }
+#[derive(Debug)]
+enum WindowShiftMode {
+    Lag,
+    Lead,
+}
+
+impl WindowShiftMode {
+    fn name(&self) -> &str {
+        match self {
+            WindowShiftMode::Lag => "lag",
+            WindowShiftMode::Lead => "lead",
+        }
+    }
+    fn shift_offset(&self, value: Option<i64>) -> i64 {
+        match self {
+            WindowShiftMode::Lag => value.unwrap_or(1),
+            WindowShiftMode::Lead => value.map(|v| v.neg()).unwrap_or(-1),
+        }
+    }
+}
 
 /// window shift expression
 #[derive(Debug)]
-pub struct WindowShift {
+struct WindowShift {
     signature: Signature,
-    name: String,
-    shift_offset: i64,
-    default_value: ScalarValue,
-    ignore_nulls: bool,
+    mode: WindowShiftMode,
 }
 
 impl WindowShift {
-    pub fn new(
-        name: String,
-        shift_offset: i64,
-        default_value: ScalarValue,
-        ignore_nulls: bool,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
             signature: Signature::one_of(
                 vec![
@@ -170,11 +182,19 @@ impl WindowShift {
                 ],
                 Volatility::Immutable,
             ),
-            name,
-            shift_offset,
-            default_value,
-            ignore_nulls,
+            mode: WindowShiftMode::Lag,
         }
+    }
+
+    pub fn with_mode(mut self, mode: WindowShiftMode) -> Self {
+        self.mode = mode;
+        self
+    }
+}
+
+impl Default for WindowShift {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -184,7 +204,7 @@ impl WindowUDFImpl for WindowShift {
     }
 
     fn name(&self) -> &str {
-        &self.name
+        &self.mode.name()
     }
 
     fn signature(&self) -> &Signature {
