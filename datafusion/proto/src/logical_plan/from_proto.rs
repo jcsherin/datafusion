@@ -584,7 +584,10 @@ pub fn parse_expr(
                 parse_exprs(&pb.args, registry, codec)?,
                 pb.distinct,
                 parse_optional_expr(pb.filter.as_deref(), registry, codec)?.map(Box::new),
-                parse_vec_expr(&pb.order_by, registry, codec)?,
+                match pb.order_by.len() {
+                    0 => None,
+                    _ => Some(parse_exprs(&pb.order_by, registry, codec)?),
+                },
                 None,
             )))
         }
@@ -672,16 +675,6 @@ pub fn from_proto_binary_op(op: &str) -> Result<Operator, Error> {
             "Unsupported binary operator '{other:?}'"
         ))),
     }
-}
-
-fn parse_vec_expr(
-    p: &[protobuf::LogicalExprNode],
-    registry: &dyn FunctionRegistry,
-    codec: &dyn LogicalExtensionCodec,
-) -> Result<Option<Vec<Expr>>, Error> {
-    let res = parse_exprs(p, registry, codec)?;
-    // Convert empty vector to None.
-    Ok((!res.is_empty()).then_some(res))
 }
 
 fn parse_optional_expr(

@@ -395,7 +395,7 @@ pub fn create_udf(
     volatility: Volatility,
     fun: ScalarFunctionImplementation,
 ) -> ScalarUDF {
-    let return_type = Arc::try_unwrap(return_type).unwrap_or_else(|t| t.as_ref().clone());
+    let return_type = Arc::unwrap_or_clone(return_type);
     ScalarUDF::from(SimpleScalarUDF::new(
         name,
         input_types,
@@ -477,8 +477,8 @@ pub fn create_udaf(
     accumulator: AccumulatorFactoryFunction,
     state_type: Arc<Vec<DataType>>,
 ) -> AggregateUDF {
-    let return_type = Arc::try_unwrap(return_type).unwrap_or_else(|t| t.as_ref().clone());
-    let state_type = Arc::try_unwrap(state_type).unwrap_or_else(|t| t.as_ref().clone());
+    let return_type = Arc::unwrap_or_clone(return_type);
+    let state_type = Arc::unwrap_or_clone(state_type);
     let state_fields = state_type
         .into_iter()
         .enumerate()
@@ -595,7 +595,7 @@ pub fn create_udwf(
     volatility: Volatility,
     partition_evaluator_factory: PartitionEvaluatorFactory,
 ) -> WindowUDF {
-    let return_type = Arc::try_unwrap(return_type).unwrap_or_else(|t| t.as_ref().clone());
+    let return_type = Arc::unwrap_or_clone(return_type);
     WindowUDF::from(SimpleWindowUDF::new(
         name,
         input_type,
