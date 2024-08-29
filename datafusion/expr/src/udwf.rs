@@ -28,6 +28,7 @@ use std::{
 use arrow::datatypes::DataType;
 
 use datafusion_common::{not_impl_err, Result};
+use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 
 use crate::expr::WindowFunction;
 use crate::{
@@ -174,8 +175,12 @@ impl WindowUDF {
     }
 
     /// Return a `PartitionEvaluator` for evaluating this window function
-    pub fn partition_evaluator_factory(&self) -> Result<Box<dyn PartitionEvaluator>> {
-        self.inner.partition_evaluator()
+    pub fn partition_evaluator_factory(
+        &self,
+        args: &[Arc<dyn PhysicalExpr>],
+        return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
+        self.inner.partition_evaluator(args, return_type)
     }
 
     /// Returns if column values are nullable for this window function.
@@ -284,7 +289,11 @@ pub trait WindowUDFImpl: Debug + Send + Sync {
     fn return_type(&self, arg_types: &[DataType]) -> Result<DataType>;
 
     /// Invoke the function, returning the [`PartitionEvaluator`] instance
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>>;
+    fn partition_evaluator(
+        &self,
+        args: &[Arc<dyn PhysicalExpr>],
+        return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>>;
 
     /// Returns any aliases (alternate names) for this function.
     ///
@@ -423,8 +432,12 @@ impl WindowUDFImpl for AliasedWindowUDFImpl {
         self.inner.return_type(arg_types)
     }
 
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
-        self.inner.partition_evaluator()
+    fn partition_evaluator(
+        &self,
+        args: &[Arc<dyn PhysicalExpr>],
+        return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
+        self.inner.partition_evaluator(args, return_type)
     }
 
     fn aliases(&self) -> &[String] {
@@ -507,7 +520,11 @@ impl WindowUDFImpl for WindowUDFLegacyWrapper {
         Ok(res.as_ref().clone())
     }
 
-    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
+    fn partition_evaluator(
+        &self,
+        _args: &[Arc<dyn PhysicalExpr>],
+        _return_type: &DataType,
+    ) -> Result<Box<dyn PartitionEvaluator>> {
         (self.partition_evaluator_factory)()
     }
 }

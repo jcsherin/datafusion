@@ -38,6 +38,7 @@ use arrow::compute::kernels::cast_utils::{
 };
 use arrow::datatypes::{DataType, Field};
 use datafusion_common::{plan_err, Column, Result, ScalarValue, TableReference};
+use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 use sqlparser::ast::NullTreatment;
 use std::any::Any;
 use std::fmt::Debug;
@@ -662,7 +663,11 @@ impl WindowUDFImpl for SimpleWindowUDF {
         Ok(self.return_type.clone())
     }
 
-    fn partition_evaluator(&self) -> Result<Box<dyn crate::PartitionEvaluator>> {
+    fn partition_evaluator(
+        &self,
+        _args: &[Arc<dyn PhysicalExpr>],
+        _return_type: &DataType,
+    ) -> Result<Box<dyn crate::PartitionEvaluator>> {
         (self.partition_evaluator_factory)()
     }
 }

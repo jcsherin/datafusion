@@ -330,7 +330,8 @@ impl BuiltInWindowFunctionExpr for WindowUDFExpr {
     }
 
     fn create_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
-        self.fun.partition_evaluator_factory()
+        self.fun
+            .partition_evaluator_factory(&self.args, &self.data_type)
     }
 
     fn name(&self) -> &str {
