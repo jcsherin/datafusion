@@ -170,7 +170,7 @@ impl WindowUDFImpl for WindowShift {
         ignore_nulls: bool,
     ) -> Result<Box<dyn PartitionEvaluator>> {
         let shift_offset = scalar_at(args, 1)?
-            .map(|value| get_signed_integer(value))
+            .map(get_signed_integer)
             .map_or(Ok(None), |v| v.map(Some))
             .map(|n| self.mode.shift_offset(n))
             .map(|offset| if is_reversed { -offset } else { offset })?;
