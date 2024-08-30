@@ -34,8 +34,8 @@ use datafusion_common::{
     exec_datafusion_err, exec_err, DataFusionError, Result, ScalarValue,
 };
 use datafusion_expr::{
-    BuiltInWindowFunction, PartitionEvaluator, WindowFrame, WindowFunctionDefinition,
-    WindowUDF,
+    BuiltInWindowFunction, PartitionEvaluator, ReversedUDWF, WindowFrame,
+    WindowFunctionDefinition, WindowUDF,
 };
 use datafusion_physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
 use datafusion_physical_expr::equivalence::collapse_lex_req;
@@ -339,7 +339,16 @@ impl BuiltInWindowFunctionExpr for WindowUDFExpr {
     }
 
     fn reverse_expr(&self) -> Option<Arc<dyn BuiltInWindowFunctionExpr>> {
-        None
+        match self.fun.reverse_udf() {
+            ReversedUDWF::Identical => Some(Arc::new(self.clone())),
+            ReversedUDWF::NotSupported => None,
+            ReversedUDWF::Reversed(fun) => Some(Arc::new(WindowUDFExpr {
+                fun,
+                args: self.args.clone(),
+                name: self.name.clone(),
+                data_type: self.data_type.clone(),
+            })),
+        }
     }
 
     fn get_result_ordering(&self, schema: &SchemaRef) -> Option<PhysicalSortExpr> {

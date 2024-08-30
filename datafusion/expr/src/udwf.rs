@@ -202,6 +202,10 @@ impl WindowUDF {
     pub fn coerce_types(&self, arg_types: &[DataType]) -> Result<Vec<DataType>> {
         self.inner.coerce_types(arg_types)
     }
+
+    pub fn reverse_udf(&self) -> ReversedUDWF {
+        self.inner.reverse_expr()
+    }
 }
 
 impl<F> From<F> for WindowUDF
@@ -393,6 +397,16 @@ pub trait WindowUDFImpl: Debug + Send + Sync {
     fn coerce_types(&self, _arg_types: &[DataType]) -> Result<Vec<DataType>> {
         not_impl_err!("Function {} does not implement coerce_types", self.name())
     }
+
+    fn reverse_expr(&self) -> ReversedUDWF {
+        ReversedUDWF::NotSupported
+    }
+}
+
+pub enum ReversedUDWF {
+    Identical,
+    NotSupported,
+    Reversed(Arc<WindowUDF>),
 }
 
 /// WindowUDF that adds an alias to the underlying function. It is better to
