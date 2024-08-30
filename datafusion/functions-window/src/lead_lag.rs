@@ -29,7 +29,8 @@ use datafusion_common::arrow::compute::concat;
 use datafusion_common::arrow::datatypes::DataType;
 use datafusion_common::{arrow_datafusion_err, DataFusionError, Result, ScalarValue};
 use datafusion_expr::{
-    Literal, PartitionEvaluator, Signature, TypeSignature, Volatility, WindowUDFImpl,
+    Literal, PartitionEvaluator, ReversedUDWF, Signature, TypeSignature, Volatility,
+    WindowUDFImpl,
 };
 use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 
@@ -165,9 +166,11 @@ impl WindowUDFImpl for WindowShift {
         &self,
         args: &[Arc<dyn PhysicalExpr>],
         return_type: &DataType,
+        is_reversed: bool,
     ) -> Result<Box<dyn PartitionEvaluator>> {
-        let shift_offset =
-            scalar_at(args, 1).and_then(|scalar| get_shift_offset(&self.mode, scalar))?;
+        let shift_offset = scalar_at(args, 1)
+            .and_then(|scalar| get_shift_offset(&self.mode, scalar))
+            .map(|offset| if is_reversed { -offset } else { offset })?;
         let default_value = scalar_at(args, 2)
             .and_then(|scalar| get_default_value(return_type, scalar))?;
 
@@ -177,6 +180,15 @@ impl WindowUDFImpl for WindowShift {
             ignore_nulls: false,
             non_null_offsets: VecDeque::new(),
         }))
+    }
+
+    fn reverse_expr(&self) -> ReversedUDWF {
+        let fun = match self.mode {
+            WindowShiftMode::Lag => lag_udwf(),
+            WindowShiftMode::Lead => lead_udwf(),
+        };
+
+        ReversedUDWF::Reversed(fun)
     }
 }
 
