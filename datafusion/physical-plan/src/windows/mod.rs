@@ -298,6 +298,7 @@ fn create_udwf_window_expr(
         args: args.to_vec(),
         name,
         data_type,
+        is_reversed: false,
     }))
 }
 
@@ -310,6 +311,7 @@ struct WindowUDFExpr {
     name: String,
     /// result type
     data_type: DataType,
+    is_reversed: bool,
 }
 
 impl BuiltInWindowFunctionExpr for WindowUDFExpr {
@@ -330,8 +332,11 @@ impl BuiltInWindowFunctionExpr for WindowUDFExpr {
     }
 
     fn create_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> {
-        self.fun
-            .partition_evaluator_factory(&self.args, &self.data_type)
+        self.fun.partition_evaluator_factory(
+            &self.args,
+            &self.data_type,
+            self.is_reversed,
+        )
     }
 
     fn name(&self) -> &str {
@@ -347,6 +352,7 @@ impl BuiltInWindowFunctionExpr for WindowUDFExpr {
                 args: self.args.clone(),
                 name: self.name.clone(),
                 data_type: self.data_type.clone(),
+                is_reversed: !self.is_reversed,
             })),
         }
     }

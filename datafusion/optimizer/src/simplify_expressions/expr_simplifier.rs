@@ -3919,6 +3919,7 @@ mod tests {
             &self,
             _args: &[Arc<dyn PhysicalExpr>],
             _return_type: &DataType,
+            _is_reversed: bool,
         ) -> Result<Box<dyn PartitionEvaluator>> {
             unimplemented!("not needed for tests")
         }

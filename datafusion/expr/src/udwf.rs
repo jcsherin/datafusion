@@ -179,8 +179,10 @@ impl WindowUDF {
         &self,
         args: &[Arc<dyn PhysicalExpr>],
         return_type: &DataType,
+        is_reversed: bool,
     ) -> Result<Box<dyn PartitionEvaluator>> {
-        self.inner.partition_evaluator(args, return_type)
+        self.inner
+            .partition_evaluator(args, return_type, is_reversed)
     }
 
     /// Returns if column values are nullable for this window function.
@@ -297,6 +299,7 @@ pub trait WindowUDFImpl: Debug + Send + Sync {
         &self,
         args: &[Arc<dyn PhysicalExpr>],
         return_type: &DataType,
+        is_reversed: bool,
     ) -> Result<Box<dyn PartitionEvaluator>>;
 
     /// Returns any aliases (alternate names) for this function.
@@ -450,8 +453,10 @@ impl WindowUDFImpl for AliasedWindowUDFImpl {
         &self,
         args: &[Arc<dyn PhysicalExpr>],
         return_type: &DataType,
+        is_reversed: bool,
     ) -> Result<Box<dyn PartitionEvaluator>> {
-        self.inner.partition_evaluator(args, return_type)
+        self.inner
+            .partition_evaluator(args, return_type, is_reversed)
     }
 
     fn aliases(&self) -> &[String] {
@@ -538,6 +543,7 @@ impl WindowUDFImpl for WindowUDFLegacyWrapper {
         &self,
         _args: &[Arc<dyn PhysicalExpr>],
         _return_type: &DataType,
+        _is_reversed: bool,
     ) -> Result<Box<dyn PartitionEvaluator>> {
         (self.partition_evaluator_factory)()
     }
