@@ -167,6 +167,7 @@ impl WindowUDFImpl for WindowShift {
         args: &[Arc<dyn PhysicalExpr>],
         return_type: &DataType,
         is_reversed: bool,
+        ignore_nulls: bool,
     ) -> Result<Box<dyn PartitionEvaluator>> {
         let shift_offset = scalar_at(args, 1)
             .and_then(|scalar| get_shift_offset(&self.mode, scalar))
@@ -177,7 +178,7 @@ impl WindowUDFImpl for WindowShift {
         Ok(Box::new(WindowShiftEvaluator {
             shift_offset,
             default_value,
-            ignore_nulls: false,
+            ignore_nulls,
             non_null_offsets: VecDeque::new(),
         }))
     }
