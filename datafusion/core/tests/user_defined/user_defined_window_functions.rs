@@ -564,6 +564,7 @@ impl OddCounter {
                 _args: &[Arc<dyn PhysicalExpr>],
                 _return_type: &DataType,
                 _is_reversed: bool,
+                _ignore_nulls: bool,
             ) -> Result<Box<dyn PartitionEvaluator>> {
                 Ok(Box::new(OddCounter::new(Arc::clone(&self.test_state))))
             }
