@@ -173,7 +173,7 @@ impl WindowUDFImpl for WindowShift {
             .map(|value| get_signed_integer(value))
             .map_or(Ok(None), |v| v.map(Some))
             .map(|n| self.mode.shift_offset(n))
-            .map(|offset| if is_reversed {-offset} else {offset})?;
+            .map(|offset| if is_reversed { -offset } else { offset })?;
         let default_value = scalar_at(args, 2)
             .and_then(|scalar| get_default_value(return_type, scalar))?;
 
@@ -196,11 +196,13 @@ impl WindowUDFImpl for WindowShift {
 }
 
 fn get_signed_integer(value: ScalarValue) -> Result<i64> {
-   if value.data_type().is_integer() {
-       value.cast_to(&DataType::Int64)?.try_into()
-   } else {
-       Err(DataFusionError::Execution("Expected an integer value".to_string()))
-   }
+    if value.data_type().is_integer() {
+        value.cast_to(&DataType::Int64)?.try_into()
+    } else {
+        Err(DataFusionError::Execution(
+            "Expected an integer value".to_string(),
+        ))
+    }
 }
 
 fn get_default_value(
