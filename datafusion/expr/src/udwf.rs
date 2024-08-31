@@ -237,6 +237,7 @@ where
 /// # use datafusion_common::{DataFusionError, plan_err, Result};
 /// # use datafusion_expr::{col, Signature, Volatility, PartitionEvaluator, WindowFrame, ExprFunctionExt};
 /// # use datafusion_expr::{WindowUDFImpl, WindowUDF};
+/// use datafusion_physical_expr_common::physical_expr::PhysicalExpr;
 /// #[derive(Debug, Clone)]
 /// struct SmoothIt {
 ///   signature: Signature
@@ -262,7 +263,7 @@ where
 ///      Ok(DataType::Int32)
 ///    }
 ///    // The actual implementation would add one to the argument
-///    fn partition_evaluator(&self) -> Result<Box<dyn PartitionEvaluator>> { unimplemented!() }
+///    fn partition_evaluator(&self, _args: &[std::sync::Arc<dyn PhysicalExpr>], _return_type: &DataType, _is_reversed: bool, _ignore_nulls: bool) -> Result<Box<dyn PartitionEvaluator>> { unimplemented!() }
 /// }
 ///
 /// // Create a new WindowUDF from the implementation
