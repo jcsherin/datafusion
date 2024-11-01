@@ -20,7 +20,8 @@ use arrow::compute::kernels::cast_utils::{
     parse_interval_month_day_nano_config, IntervalParseConfig, IntervalUnit,
 };
 use arrow::datatypes::DECIMAL128_MAX_PRECISION;
-use arrow_schema::DataType;
+use arrow_schema::{DataType, DECIMAL128_MAX_SCALE};
+use bigdecimal::ToPrimitive;
 use datafusion_common::{
     internal_err, not_impl_err, plan_err, DFSchema, DataFusionError, Result, ScalarValue,
 };
@@ -31,6 +32,8 @@ use log::debug;
 use sqlparser::ast::{BinaryOperator, Expr as SQLExpr, Interval, UnaryOperator, Value};
 use sqlparser::parser::ParserError::ParserError;
 use std::borrow::Cow;
+use std::ops::Neg;
+use std::str::FromStr;
 
 impl<'a, S: ContextProvider> SqlToRel<'a, S> {
     pub(crate) fn parse_value(
@@ -319,38 +322,70 @@ const fn try_decode_hex_char(c: u8) -> Option<u8> {
 ///
 /// TODO: support parsing from scientific notation
 fn parse_decimal_128(unsigned_number: &str, negative: bool) -> Result<Expr> {
-    // remove leading zeroes
-    let trimmed = unsigned_number.trim_start_matches('0');
-    // Parse precision and scale, remove decimal point if exists
-    let (precision, scale, replaced_str) = if trimmed == "." {
-        // Special cases for numbers such as “0.”, “000.”, and so on.
-        (1, 0, Cow::Borrowed("0"))
-    } else if let Some(i) = trimmed.find('.') {
-        (
-            trimmed.len() - 1,
-            trimmed.len() - i - 1,
-            Cow::Owned(trimmed.replace('.', "")),
-        )
-    } else {
-        // No decimal point, keep as is
-        (trimmed.len(), 0, Cow::Borrowed(trimmed))
-    };
-
-    let number = replaced_str.parse::<i128>().map_err(|e| {
+    let big_decimal = bigdecimal::BigDecimal::from_str(unsigned_number).map_err(|e| {
         DataFusionError::from(ParserError(format!(
-            "Cannot parse {replaced_str} as i128 when building decimal: {e}"
+            "Cannot parse {unsigned_number} as i128 when building decimal: {e}"
         )))
     })?;
 
-    // Check precision overflow
-    if precision as u8 > DECIMAL128_MAX_PRECISION {
+    let (bigint, scale) = big_decimal.as_bigint_and_exponent();
+    let digits = big_decimal.digits();
+
+    if digits > DECIMAL128_MAX_PRECISION as u64 {
         return Err(DataFusionError::from(ParserError(format!(
-            "Cannot parse {replaced_str} as i128 when building decimal: precision overflow"
+            "Cannot parse {bigint} as i128 when building decimal: precision overflow"
         ))));
     }
 
+    if scale.unsigned_abs() > DECIMAL128_MAX_SCALE as u64 {
+        return Err(DataFusionError::from(ParserError(format!(
+            "Cannot parse {unsigned_number} as i128 when building decimal: scale overflow"
+        ))));
+    }
+
+    // This is a workaround for encoding values where the scale is
+    // greater than the precision.
+    //
+    // Example #1: `0000.00`
+    // The leading zeroes are not significant so this is the same as
+    // the value `0.00`. The precision is `1` and the scale is `2`.
+    //
+    // Runtime error:
+    // `Arrow error: Invalid argument error: scale 2 is greater than precision 1`
+    //
+    // Example #2: `0.01`
+    // This is the same as `1x10^(-2)` or `1E-2`. The precision is `1`
+    // and the scale is `2`.
+    //
+    // Runtime error:
+    // `Arrow error: Invalid argument error: scale 2 is greater than precision 1`
+    //
+    // Example #3: `0.011`
+    // This is the same as `11x10^(-3)` or `11E-3`. The precision is
+    // `2` and the scale is `3`.
+    //
+    // Runtime error:
+    // `Arrow error: Invalid argument error: scale 3 is greater than precision 2`
+    //
+    let precision = if scale > digits as i64 {
+        scale as u64
+    } else {
+        digits
+    };
+
+    // It is safe to `.unwrap()` because `i128::MAX` and `i128::MIN` are
+    // 39 digits and we have already verified that precision does not
+    // exceed `DECIMAL128_MAX_SCALE` which is defined as 38.
+    let number = bigint
+        .to_i128()
+        .map(|value| if negative { value.neg() } else { value })
+        .unwrap();
+    // .ok_or(DataFusionError::from(ParserError(format!(
+    //     "Cannot parse {unsigned_number} as i128 when building decimal"
+    // ))))?;
+
     Ok(Expr::Literal(ScalarValue::Decimal128(
-        Some(if negative { -number } else { number }),
+        Some(number),
         precision as u8,
         scale as i8,
     )))
@@ -359,6 +394,7 @@ fn parse_decimal_128(unsigned_number: &str, negative: bool) -> Result<Expr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_decode_hex_literal() {
@@ -378,5 +414,156 @@ mod tests {
             let output = try_decode_hex_literal(input);
             assert_eq!(output, expect);
         }
+    }
+    #[test]
+    fn test_decimal_zero_parsing() {
+        let zeroes_basic = vec![
+            ("0", 1, 0),
+            ("00", 1, 0),
+            ("000", 1, 0),
+            ("0.", 1, 0),
+            ("00.", 1, 0),
+            ("000.", 1, 0),
+            ("0.0", 1, 1),
+            ("00.0", 1, 1),
+            ("000.0", 1, 1),
+            ("0.00", 1, 2),
+            ("00.00", 1, 2),
+            ("000.00", 1, 2),
+            ("0.000", 1, 3),
+            ("00.000", 1, 3),
+            ("000.000", 1, 3),
+            (".0", 1, 1),
+            (".00", 1, 2),
+            (".000", 1, 3),
+        ];
+
+        let zeroes_exp_zero = vec![
+            ("0e0", 1, 0),
+            ("00e0", 1, 0),
+            ("000e0", 1, 0),
+            ("0.e0", 1, 0),
+            ("00.e0", 1, 0),
+            ("000.e0", 1, 0),
+            ("0.0e0", 1, 1),
+            ("00.0e0", 1, 1),
+            ("000.0e0", 1, 1),
+            ("0.00e0", 1, 2),
+            ("00.00e0", 1, 2),
+            ("000.00e0", 1, 2),
+            ("0.000e0", 1, 3),
+            ("00.000e0", 1, 3),
+            ("000.000e0", 1, 3),
+            (".0e0", 1, 1),
+            (".00e0", 1, 2),
+            (".000e0", 1, 3),
+        ];
+
+        let zeroes_exp_one = vec![
+            ("0e1", 1, -1),
+            ("00e1", 1, -1),
+            ("000e1", 1, -1),
+            ("0.e1", 1, -1),
+            ("00.e1", 1, -1),
+            ("000.e1", 1, -1),
+            ("0.0e1", 1, 0),
+            ("00.0e1", 1, 0),
+            ("000.0e1", 1, 0),
+            ("0.00e1", 1, 1),
+            ("00.00e1", 1, 1),
+            ("000.00e1", 1, 1),
+            ("0.000e1", 1, 2),
+            ("00.000e1", 1, 2),
+            ("000.000e1", 1, 2),
+            (".0e1", 1, 0),
+            (".00e1", 1, 1),
+            (".000e1", 1, 2),
+        ];
+
+        let zeroes_exp_two = vec![
+            ("0e2", 1, -2),
+            ("00e2", 1, -2),
+            ("000e2", 1, -2),
+            ("0.e2", 1, -2),
+            ("00.e2", 1, -2),
+            ("000.e2", 1, -2),
+            ("0.0e2", 1, -1),
+            ("00.0e2", 1, -1),
+            ("000.0e2", 1, -1),
+            ("0.00e2", 1, 0),
+            ("00.00e2", 1, 0),
+            ("000.00e2", 1, 0),
+            ("0.000e2", 1, 1),
+            ("00.000e2", 1, 1),
+            ("000.000e2", 1, 1),
+            (".0e2", 1, -1),
+            (".00e2", 1, 0),
+            (".000e2", 1, 1),
+        ];
+
+        let zeroes_exp_three = vec![
+            ("0e3", 1, -3),
+            ("00e3", 1, -3),
+            ("000e3", 1, -3),
+            ("0.e3", 1, -3),
+            ("00.e3", 1, -3),
+            ("000.e3", 1, -3),
+            ("0.0e3", 1, -2),
+            ("00.0e3", 1, -2),
+            ("000.0e3", 1, -2),
+            ("0.00e3", 1, -1),
+            ("00.00e3", 1, -1),
+            ("000.00e3", 1, -1),
+            ("0.000e3", 1, 0),
+            ("00.000e3", 1, 0),
+            ("000.000e3", 1, 0),
+            (".0e3", 1, -2),
+            (".00e3", 1, -1),
+            (".000e3", 1, 0),
+        ];
+
+        let other_cases = vec![
+            ("0.1", 1, 1),                      // "Decimal128(Some(1),1,1)"),
+            ("0.01", 1, 2),                     // "Decimal128(Some(1),2,2)"),
+            ("1.0", 2, 1),                      // "Decimal128(Some(10),2,1)"),
+            ("10.01", 4, 2),                    // "Decimal128(Some(1001),4,2)"),
+            ("10.00", 4, 2),                    // "Decimal128(Some(1001),4,2)"),
+            ("10000000000000000000.00", 22, 2), // "Decimal128(Some(1000000000000000000000),22,2)",
+            ("18446744073709551616", 20, 0), // "Decimal128(Some(18446744073709551616),20,0)",
+        ];
+
+        let test_cases = [
+            zeroes_basic,
+            zeroes_exp_zero,
+            zeroes_exp_one,
+            zeroes_exp_two,
+            zeroes_exp_three,
+            other_cases,
+        ]
+        .concat();
+
+        // Table header
+        println!(" ## |{:8}in |{:18}BD | bgnt | prec | scle | norm |", "", "");
+        println!("{:-<76}", "");
+
+        let mut count = 1;
+        for (input, precision, scale) in &test_cases {
+            let big_decimal = bigdecimal::BigDecimal::from_str(input).unwrap();
+            let (bigint, exponent) = big_decimal.as_bigint_and_exponent();
+            let digits = big_decimal.digits();
+
+            assert_eq!(
+                *precision as i64, digits as i64,
+                "precision != {digits} for {input} | exp={exponent}"
+            );
+            assert_eq!(*scale as i64, exponent, "scale != {exponent} for {input}");
+
+            // Table row
+            println!(
+                "{count:>3} | {input:>10}| {big_decimal:>20}| {bigint:>5}| {precision:>5}| {scale:>5}| {:>5}|", big_decimal.normalized()
+            );
+            count += 1;
+        }
+        println!("{:-<76}", "");
     }
 }
